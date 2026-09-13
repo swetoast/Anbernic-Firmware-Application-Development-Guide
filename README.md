@@ -1,4 +1,4 @@
-# RG40XX V Stock Firmware Application Development Guide
+# Anbernic Firmware Application Development Guide
 
 This guide documents application packaging, runtime behaviour and hardware interfaces tested on Anbernic RG40XX V hardware using the original stock firmware environment referred to here as **TF1**. Most findings were verified on a first unit and independently re-confirmed on a second unit; where the two units differed, the difference is recorded below as verified per-unit behaviour.
 
