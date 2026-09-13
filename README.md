@@ -5,8 +5,11 @@ This guide documents application packaging, runtime behaviour and hardware inter
 This guide distinguishes between:
 
 - **Verified behaviour**, observed directly on the tested device.
+
 - **Recommended practice**, based on those verified results.
+
 - **Stock-firmware leads**, found in original-firmware application material but not yet re-confirmed on both tested units.
+
 - **Unresolved behaviour**, which should not be assumed by applications.
 
 These findings apply to the tested original TF1 environment. Other firmware releases may use different paths, libraries, mappings, display initialisation or audio behaviour. Findings from KNULLI, muOS, Batocera, Stock OS MOD and other offshoots are outside the scope of this guide unless separately verified on original TF1.
@@ -30,7 +33,7 @@ The architecture, OS base, Python, Pillow, glibc, kernel and SDL video driver we
 
 ### Pillow compatibility
 
-TF1 uses Pillow 9.0.1. Do not require APIs introduced by newer Pillow releases. In particular, direct use of `Image.Resampling.LANCZOS` is not compatible with the tested environment.
+TF1 uses Pillow 9.0.1. Do not require APIs introduced by newer Pillow releases. In particular, direct use of Image.Resampling.LANCZOS is not compatible with the tested environment.
 
 ```python
 from PIL import Image
@@ -77,7 +80,6 @@ These paths and values are stock-firmware leads, not yet two-unit verified facts
 ```python
 from pathlib import Path
 
-
 def read_first_line(path, default=None):
     try:
         lines = Path(path).read_text(encoding="utf-8").splitlines()
@@ -96,7 +98,7 @@ TF1 discovers application launchers placed directly in:
 /mnt/mmc/Roms/APPS
 ```
 
-A folder containing only a launcher did not appear in the stock menu. A shell script placed directly in `APPS` did appear.
+A folder containing only a launcher did not appear in the stock menu. A shell script placed directly in APPS did appear.
 
 Use a top-level launcher and a matching application folder:
 
@@ -118,19 +120,29 @@ Use a top-level launcher and a matching application folder:
 
 Directory roles:
 
-- `My_App.sh`: launcher shown by the TF1 menu.
-- `main.py`: application entry point.
-- `audio_worker.py`: optional isolated SDL audio process.
-- `app/`: substantial application modules.
-- `assets/`: packaged images, sounds and other local assets.
-- `modules/`: application-local pure-Python dependencies.
-- `lib/`: application-local AArch64 shared libraries.
-- `config/`: persistent settings.
-- `data/`: persistent saves, durable state and intentional caches.
-- `logs/`: bounded runtime logs.
-- `tests/`: consolidated regression tests where the application includes them.
+- \`My_App.sh\`: launcher shown by the TF1 menu.
 
-Use `/tmp` for render frames, scratch files and session-only state. Do not write high-frequency generated frames into `data/`. Keep the source cohesive. Add a new file only when it represents a substantial separate subsystem.
+- \`main.py\`: application entry point.
+
+- \`audio_worker.py\`: optional isolated SDL audio process.
+
+- \`app/\`: substantial application modules.
+
+- \`assets/\`: packaged images, sounds and other local assets.
+
+- \`modules/\`: application-local pure-Python dependencies.
+
+- \`lib/\`: application-local AArch64 shared libraries.
+
+- \`config/\`: persistent settings.
+
+- \`data/\`: persistent saves, durable state and intentional caches.
+
+- \`logs/\`: bounded runtime logs.
+
+- \`tests/\`: consolidated regression tests where the application includes them.
+
+Use /tmp for render frames, scratch files and session-only state. Do not write high-frequency generated frames into data/. Keep the source cohesive. Add a new file only when it represents a substantial separate subsystem.
 
 ### Candidate stock menu icon layout
 
@@ -145,7 +157,7 @@ Original-firmware application material indicates this optional layout:
     `-- My_App.png
 ```
 
-The apparent convention is `Imgs/<launcher-name>.png`. Exact filename matching, dimensions, format and menu cache behaviour remain unverified. Applications must remain usable without a custom icon.
+The apparent convention is Imgs/<launcher-name>.png. Exact filename matching, dimensions, format and menu cache behaviour remain unverified. Applications must remain usable without a custom icon.
 
 ### TF2 storage lead
 
@@ -155,11 +167,13 @@ Original-firmware application material identifies the probable second-card mount
 /mnt/sdcard
 ```
 
-The verified TF1 path remains `/mnt/mmc`. Before using TF2, confirm the path exists, is mounted and is accessible. An existing empty directory is not proof that a card is mounted.
+The verified TF1 path remains /mnt/mmc. Before using TF2, confirm the path exists, is mounted and is accessible. An existing empty directory is not proof that a card is mounted.
+
+The older generic [Appbernic framework](https://github.com/gizmo2040/appbernic) independently uses `/mnt/mmc/Roms` and `/mnt/sdcard/Roms` as its first-card and second-card ROM roots. This supports `/mnt/sdcard` as a useful stock-firmware lead, but it does not replace verification on the tested RG40XX V units.
 
 ## 3. Recommended launcher
 
-Save the launcher as `/mnt/mmc/Roms/APPS/My_App.sh`.
+Save the launcher as /mnt/mmc/Roms/APPS/My_App.sh.
 
 ```bash
 #!/bin/bash
@@ -255,11 +269,11 @@ exit $?
 
 The lock prevents multiple fullscreen instances. Writable-directory checks allow the app to start with temporary state if the APPS partition is read-only.
 
-Bound persistent log growth. The launcher above appends to `app.log`, so either implement rotation before launch or make the application responsible for rotation. Do not claim logs are bounded unless the package actually enforces a limit.
+Bound persistent log growth. The launcher above appends to app.log, so either implement rotation before launch or make the application responsible for rotation. Do not claim logs are bounded unless the package actually enforces a limit.
 
-Do not run `sync` after every normal exit. Use it after installation or an important persistent update when data changed.
+Do not run sync after every normal exit. Use it after installation or an important persistent update when data changed.
 
-```bash
+```text
 bash -n /mnt/mmc/Roms/APPS/My_App.sh
 sed -i 's/\r$//' /mnt/mmc/Roms/APPS/My_App.sh
 ```
@@ -276,7 +290,7 @@ Original-firmware launchers identify:
 
 Some stock launchers start this helper before a fullscreen Python application. It may handle volume buttons, the stock volume heads-up display, or both. Its exact role is unresolved.
 
-Do not use `kill -9 $(pidof volumeCtrl.dge)`. That can kill instances not started by the current launcher and prevents clean shutdown. If later testing proves the helper is required, retain the exact PID started by the launcher and terminate only that process with a normal signal first.
+Do not use kill -9 $(pidof volumeCtrl.dge). That can kill instances not started by the current launcher and prevents clean shutdown. If later testing proves the helper is required, retain the exact PID started by the launcher and terminate only that process with a normal signal first.
 
 Do not add the helper to the recommended launcher until testing confirms that it is required, does not conflict with SDL input, avoids duplicate instances and returns cleanly to TF1.
 
@@ -292,7 +306,7 @@ mali SDL video driver
 opengles2 accelerated renderer
 ```
 
-The `mali` video driver was re-confirmed on a second unit through a video-only `SDL_InitSubSystem(SDL_INIT_VIDEO)` probe. The accelerated renderer requires a window and was not re-probed headlessly.
+The mali video driver was re-confirmed on a second unit through a video-only SDL_InitSubSystem(SDL_INIT_VIDEO) probe. The accelerated renderer requires a window and was not re-probed headlessly.
 
 ```python
 SDL_INIT_VIDEO = 0x00000020
@@ -329,9 +343,9 @@ else:
     raise RuntimeError("SDL2 library not found")
 ```
 
-Open joystick index `0` and verify the reported device name. The tested device reports `ANBERNIC-keys`. Request accelerated rendering with present synchronisation first, then retry with software rendering if creation fails.
+Open joystick index 0 and verify the reported device name. The tested device reports ANBERNIC-keys. Request accelerated rendering with present synchronisation first, then retry with software rendering if creation fails.
 
-Render transient Pillow frames under `/tmp`, for example `/tmp/My_App-screen.bmp`, and remove them during normal shutdown.
+Render transient Pillow frames under /tmp, for example /tmp/My_App-screen.bmp, and remove them during normal shutdown.
 
 ### Stock SDL and PySDL2 leads
 
@@ -346,9 +360,9 @@ SDL 2.0.12
 
 These exact paths and the PySDL2 installation remain unconfirmed across both units. The verified ctypes loader remains the baseline.
 
-If PySDL2 is unavailable, package pure-Python bindings under `modules/`. Never extract `sdl2.zip` or any application archive into `/`. Root extraction can overwrite firmware files and violates the package-local dependency model.
+If PySDL2 is unavailable, package pure-Python bindings under modules/. Never extract sdl2.zip or any application archive into /. Root extraction can overwrite firmware files and violates the package-local dependency model.
 
-Stock apps have been observed requesting `SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_SHOWN`. TF1 still has no verified desktop compositor. Always query actual window dimensions.
+Stock apps have been observed requesting SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_SHOWN. TF1 still has no verified desktop compositor. Always query actual window dimensions.
 
 ## 5. Verified physical input mapping
 
@@ -381,11 +395,11 @@ Volume Down:     button 15 on the first unit only
 Volume Up:       button 16 on the first unit only
 ```
 
-Button `13` is the normal short Menu press. TF1 emits button `8` as a separate Menu Hold event. Preserve short button `13` presses as ordinary input. If button `8` is used for navigation, remove it from held-button state after handling it rather than assuming a normal paired down/up lifetime.
+Button 13 is the normal short Menu press. TF1 emits button 8 as a separate Menu Hold event. Preserve short button 13 presses as ordinary input. If button 8 is used for navigation, remove it from held-button state after handling it rather than assuming a normal paired down/up lifetime.
 
-Buttons `12` and `14` remain physically unassigned.
+Buttons 12 and 14 remain physically unassigned.
 
-A second unit reported `14` joystick buttons, indices `0` through `13`, and `6` axes through `js0`. Buttons `0` through `13` matched across both units, including Menu Hold and short Menu. Volume keys were not joystick buttons `15` and `16` on the second unit. Treat volume keys as potentially exposed through evdev `EV_KEY` events and identify the device by name rather than hardcoding `event1`.
+A second unit reported 14 joystick buttons, indices 0 through 13, and 6 axes through js0. Buttons 0 through 13 matched across both units, including Menu Hold and short Menu. Volume keys were not joystick buttons 15 and 16 on the second unit. Treat volume keys as potentially exposed through evdev EV_KEY events and identify the device by name rather than hardcoding event1.
 
 ```text
 0   centred
@@ -403,7 +417,7 @@ If a button press starts an input test, arm on button down and begin capture aft
 
 ## 6. Analogue stick input
 
-The physical stick press is `button 9`. The tested inventory exposes `ANBERNIC-keys` through `js0` and `event1`. SDL button and hat events work, but analogue movement was not reliably observed through the initial SDL parser. Read analogue movement non-blockingly from `/dev/input/js0` while SDL continues to handle display, buttons and D-pad.
+The physical stick press is button 9. The tested inventory exposes ANBERNIC-keys through js0 and event1. SDL button and hat events work, but analogue movement was not reliably observed through the initial SDL parser. Read analogue movement non-blockingly from /dev/input/js0 while SDL continues to handle display, buttons and D-pad.
 
 ```python
 import os
@@ -426,11 +440,11 @@ Axis 0: horizontal, left negative, right positive
 Axis 1: vertical, up negative, down positive
 ```
 
-Only axes `0` and `1` have verified physical meaning. Enumerate all axes. A practical initial dead zone is `8000`; precise apps should support calibration. Diagnostics uses a 50 ms controlled sample interval.
+Only axes 0 and 1 have verified physical meaning. Enumerate all axes. A practical initial dead zone is 8000; precise apps should support calibration. Diagnostics uses a 50 ms controlled sample interval.
 
 ## 7. Verified internal-speaker audio
 
-The internal SDL output device is `audiocodec`. It was re-confirmed as ALSA card `0` on a second unit. That unit also exposed `ahubdam`, `ahubhdmi` and a `bluealsa` PCM while Bluetooth was running.
+The internal SDL output device is audiocodec. It was re-confirmed as ALSA card 0 on a second unit. That unit also exposed ahubdam, ahubhdmi and a bluealsa PCM while Bluetooth was running.
 
 ```text
 Sample rate:    48,000 Hz
@@ -446,18 +460,28 @@ A 120 ms, 440 Hz tone at 2% waveform amplitude was audible. Two-channel PCM acce
 Use an isolated audio worker:
 
 1. Initialise SDL audio.
-2. Enumerate outputs.
-3. Select a name beginning with `audiocodec`.
-4. Open with the verified desired format.
-5. Queue PCM.
-6. Unpause.
-7. Wait for the queued byte count to reach zero or a deadline.
-8. Pause.
-9. Clear the queue.
-10. Close the device.
-11. Exit the worker without global `SDL_Quit()`.
 
-The parent must retain a watchdog. Global `SDL_Quit()` blocked during testing after audio close. Do not use blocking `aplay` from the graphical process; that tested path became unresponsive and required forced power-off.
+1. Enumerate outputs.
+
+1. Select a name beginning with \`audiocodec\`.
+
+1. Open with the verified desired format.
+
+1. Queue PCM.
+
+1. Unpause.
+
+1. Wait for the queued byte count to reach zero or a deadline.
+
+1. Pause.
+
+1. Clear the queue.
+
+1. Close the device.
+
+1. Exit the worker without global \`SDL_Quit()\`.
+
+The parent must retain a watchdog. Global SDL_Quit() blocked during testing after audio close. Do not use blocking aplay from the graphical process; that tested path became unresponsive and required forced power-off.
 
 Useful tests include left-only, right-only, combined output, 100 Hz through 16 kHz, 1% through 25% amplitude and 60 Hz through 315 Hz resonance checks. Use neutral labels unless physical stereo separation is verified.
 
@@ -491,7 +515,6 @@ voltage_now: microvolts, divide by 1,000,000
 ```python
 from pathlib import Path
 
-
 def read_sysfs(path, default="Unavailable"):
     try:
         return Path(path).read_text(encoding="utf-8").strip()
@@ -507,9 +530,9 @@ Original-firmware application material identifies:
 /sys/class/power_supply/axp2202-battery/moto
 ```
 
-The reported values are `1` to start and `0` to stop. This is unresolved on the tested units. Do not write to it until existence, permissions, accepted values, stop behaviour, crash behaviour and emulator-rumble interaction are verified.
+The reported values are 1 to start and 0 to stop. This is unresolved on the tested units. Do not write to it until existence, permissions, accepted values, stop behaviour, crash behaviour and emulator-rumble interaction are verified.
 
-If verified later, open the sysfs attribute directly. Do not use `shell=True` with a compound echo command. Always guarantee that `0` is written during cleanup, keep pulses short and rate-limit them.
+If verified later, open the sysfs attribute directly. Do not use shell=True with a compound echo command. Always guarantee that 0 is written during cleanup, keep pulses short and rate-limit them.
 
 ## 9. System information, USB power and thermals
 
@@ -531,11 +554,11 @@ thermal_zone3: ddr_thermal_zone
 thermal_zone4: axp2202-battery
 ```
 
-All five names were re-confirmed in order on a second unit. Values are millidegrees Celsius; divide by `1,000`. Diagnostics currently displays CPU and GPU telemetry. VE and DDR remain available to applications.
+All five names were re-confirmed in order on a second unit. Values are millidegrees Celsius; divide by 1,000. Diagnostics currently displays CPU and GPU telemetry. VE and DDR remain available to applications.
 
 ## 10. Display, HDMI and stock heads-up investigation
 
-The tested framebuffer is `/dev/fb0`.
+The tested framebuffer is /dev/fb0.
 
 ### Framebuffer geometry is state-dependent
 
@@ -566,7 +589,7 @@ Reported panel modes:
 640 x 480 at 59 Hz
 ```
 
-The identical stride is coincidental: `640 x 4` and `1280 x 2` both equal `2,560`. Never use stride alone to infer geometry.
+The identical stride is coincidental: 640 x 4 and 1280 x 2 both equal 2,560. Never use stride alone to infer geometry.
 
 ```python
 import fcntl
@@ -580,7 +603,7 @@ xres, yres, xres_virtual, yres_virtual, xoffset, yoffset, bpp = struct.unpack_fr
 os.close(fd)
 ```
 
-Both tested states exposed no DRM connector entries, no standard backlight device, no X11 and no Wayland. Use fullscreen SDL2 at 640 x 480 instead of writing directly to `/dev/fb0`.
+Both tested states exposed no DRM connector entries, no standard backlight device, no X11 and no Wayland. Use fullscreen SDL2 at 640 x 480 instead of writing directly to /dev/fb0.
 
 ### HDMI state lead
 
@@ -590,11 +613,10 @@ Original-firmware material identifies:
 /sys/class/extcon/hdmi/state
 ```
 
-Reported values are `HDMI=0` and `HDMI=1`. This remains unconfirmed across both units.
+Reported values are HDMI=0 and HDMI=1. This remains unconfirmed across both units.
 
 ```python
 from pathlib import Path
-
 
 def read_hdmi_state():
     try:
@@ -612,20 +634,37 @@ Do not assume HDMI keeps the internal geometry. Re-query window size and handle 
 
 ### Stock heads-up display lead
 
-`/mnt/mod/ctrl/volumeCtrl.dge` is the primary original-firmware lead for a system-wide heads-up display. Before implementing an independent battery popup, determine:
+/mnt/mod/ctrl/volumeCtrl.dge is the primary original-firmware lead for a system-wide heads-up display. Before implementing an independent battery popup, determine:
 
 - Whether it displays a volume notification over custom apps and emulators.
+
 - Whether it runs during emulation.
+
 - Which input and display devices it opens.
+
 - Whether it uses SDL, EGL, OpenGL ES, Mali, direct framebuffer access or another stock interface.
-- Whether it communicates with `dmenu.bin` or another process.
+
+- Whether it communicates with \`dmenu.bin\` or another process.
+
 - Whether it exposes a socket, FIFO, shared-memory object, signal interface or command-line protocol.
-- Whether `/mnt/mod/ctrl` contains battery, brightness or general notification helpers.
+
+- Whether \`/mnt/mod/ctrl\` contains battery, brightness or general notification helpers.
+
 - Whether its overlay survives emulator page flipping and HDMI output.
 
 Do not assume a second fullscreen SDL window can behave like an Android overlay. Probe the stock helper first.
 
 Recommended screen tests remain solid colours, greyscale, colour bars, gradients, checkerboards, one-pixel lines, borders, corner markers, a centre crosshair and cycling pixel-inspection fields. Do not implement brightness or resolution changes before a safe interface is verified.
+
+### Historical direct-framebuffer implementations
+
+The older generic [Appbernic framework](https://github.com/gizmo2040/appbernic) renders Pillow images by memory-mapping `/dev/fb0` as a fixed 640 x 480, 32-bit surface and issuing hardcoded framebuffer ioctls before drawing.
+
+That implementation was not written for the verified RG40XX V TF1 display states. It does not account for the state-dependent geometry documented above, including the 1280 x 1024, 16-bit idle state and the 640 x 480, 32-bit SDL application state.
+
+Do not copy its framebuffer mapping, fixed buffer size or ioctl payloads into an RG40XX V application. Use the verified SDL2/Mali path. Any direct-framebuffer experiment must first read the current geometry, identify every ioctl structure and side effect, and include a reliable restoration path.
+
+The framework also contains red-and-blue channel conversion for its direct framebuffer renderer. Do not apply that conversion to the verified SDL RGBA texture path unless a device test proves that the SDL path requires it.
 
 ## 11. Verified fonts and stock font lead
 
@@ -641,7 +680,7 @@ Verified usable fonts:
 /usr/share/fonts/TTF/DejaVuSansMono.ttf
 ```
 
-All seven were re-confirmed on a second unit and loaded with Pillow at sizes `10`, `12`, `14`, `16`, `22` and `36`.
+All seven were re-confirmed on a second unit and loaded with Pillow at sizes 10, 12, 14, 16, 22 and 36.
 
 Use DejaVu Sans for labels and natural-language status, Bold for headings, Mono for measurements and Mono Bold for prominent aligned values. Do not assume Liberation Sans exists. Measure rendered pixel width instead of truncating by character count.
 
@@ -679,13 +718,13 @@ word 43    background green
 word 44    background blue
 ```
 
-Treat effect and enabled fields as read-only until separately verified. Before editing, verify size and integrity, clamp byte-style values to `0` through `255`, preserve original bytes, write and verify the complete replacement, and restore the original on failure. Do not write unverified data to a live LED endpoint. TF1 may reload the file only after the app exits.
+Treat effect and enabled fields as read-only until separately verified. Before editing, verify size and integrity, clamp byte-style values to 0 through 255, preserve original bytes, write and verify the complete replacement, and restore the original on failure. Do not write unverified data to a live LED endpoint. TF1 may reload the file only after the app exits.
 
 ## 13. Offline assets and stock resources
 
 Bundle required UI assets locally. Do not depend on network-hosted fonts, icons or images. A compact app may use one cohesive sprite sheet instead of many small files. Keep readable text labels so the UI remains usable if decorative assets fail.
 
-Do not bundle fonts already available in the verified environment unless the application requires another typeface. `/mnt/vendor/bin/default.ttf` is a stock lead, not yet a verified dependency.
+Do not bundle fonts already available in the verified environment unless the application requires another typeface. /mnt/vendor/bin/default.ttf is a stock lead, not yet a verified dependency.
 
 The possible stock launcher-icon convention is:
 
@@ -704,7 +743,7 @@ wlan0
 wlan1
 ```
 
-Both use `rtl8821cs`, re-confirmed on a second unit. The tested environment exposes 2.4 GHz and 5 GHz support. `wlan0` connected in managed mode on 5 GHz and a saved profile reconnected after reboot.
+Both use rtl8821cs, re-confirmed on a second unit. The tested environment exposes 2.4 GHz and 5 GHz support. wlan0 connected in managed mode on 5 GHz and a saved profile reconnected after reboot.
 
 Active stack:
 
@@ -727,9 +766,9 @@ nmcli
 
 The default gateway was reachable. A single DNS lookup returned no result, so DNS reliability was not established.
 
-Bluetooth exposes `hci0` through a Realtek UART controller reporting HCI 4.1. The active stack includes `bluetoothd`, `rtk_hciattach` and `rtl_btlpm`. Available tools include `bluetoothctl`, `hciconfig`, `hcitool` and `rfkill`.
+Bluetooth exposes hci0 through a Realtek UART controller reporting HCI 4.1. The active stack includes bluetoothd, rtk_hciattach and rtl_btlpm. Available tools include bluetoothctl, hciconfig, hcitool and rfkill.
 
-The tested `bluetoothctl` supports:
+The tested bluetoothctl supports:
 
 ```text
 bluetoothctl devices Paired
@@ -737,7 +776,7 @@ bluetoothctl devices Connected
 bluetoothctl devices Bonded
 ```
 
-The older `paired-devices` command is unavailable. Google Pixel Buds Pro and a Nintendo Pro Controller were simultaneously paired, bonded and connected. The controller worked for normal input. BlueALSA exposes a `bluealsa` PCM while the Bluetooth stack runs.
+The older paired-devices command is unavailable. Google Pixel Buds Pro and a Nintendo Pro Controller were simultaneously paired, bonded and connected. The controller worked for normal input. BlueALSA exposes a bluealsa PCM while the Bluetooth stack runs.
 
 ## 15. Reference implementation
 
@@ -755,9 +794,9 @@ The older `paired-devices` command is unavailable. Google Pixel Buds Pro and a N
         `-- test_diagnostics.py
 ```
 
-The reference demonstrates fullscreen SDL2 and Pillow rendering, physical-layout button testing, separate Menu short and hold events, D-pad hats, direct `js0` analogue monitoring, controlled sampling, range tracking, unknown-button discovery, isolated audio, screen patterns, battery, USB power, thermals, offline assets and consolidated regression tests.
+The reference demonstrates fullscreen SDL2 and Pillow rendering, physical-layout button testing, separate Menu short and hold events, D-pad hats, direct js0 analogue monitoring, controlled sampling, range tracking, unknown-button discovery, isolated audio, screen patterns, battery, USB power, thermals, offline assets and consolidated regression tests.
 
-Generated frames remain under `/tmp`, not `data/`.
+Generated frames remain under /tmp, not data/.
 
 ## 16. Installation and validation
 
@@ -767,26 +806,26 @@ cp -a My_App /mnt/mmc/Roms/APPS/
 sync
 ```
 
-```bash
+```text
 bash -n /mnt/mmc/Roms/APPS/My_App.sh
 PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile /mnt/mmc/Roms/APPS/My_App/main.py
 ls -lah /mnt/mmc/Roms/APPS/My_App.sh
 ls -lah /mnt/mmc/Roms/APPS/My_App/
 ```
 
-Run `sync` after installation, not after every ordinary exit.
+Run sync after installation, not after every ordinary exit.
 
 ## 17. VFAT and multiple-card storage
 
 The APPS partition is VFAT, re-confirmed on a second unit. Do not rely on Unix ownership, executable metadata, symbolic links, case sensitivity or fully POSIX replacement semantics.
 
-Use `/tmp` for scratch data. Use `config/`, `data/` and `logs/` only for persistent content. Avoid unnecessary writes.
+Use /tmp for scratch data. Use config/, data/ and logs/ only for persistent content. Avoid unnecessary writes.
 
-The verified TF1 root is `/mnt/mmc`. `/mnt/sdcard` is the probable TF2 mount from stock material. Before using TF2, confirm it is mounted and accessible. Handle missing, empty, removed and read-only cards. Keep packaged code anchored to the launcher directory rather than searching both cards.
+The verified TF1 root is /mnt/mmc. /mnt/sdcard is the probable TF2 mount from stock material. Before using TF2, confirm it is mounted and accessible. Handle missing, empty, removed and read-only cards. Keep packaged code anchored to the launcher directory rather than searching both cards.
 
 ## 18. Local dependencies
 
-Pure-Python dependencies belong under `modules/`. AArch64 shared libraries belong under `lib/`.
+Pure-Python dependencies belong under modules/. AArch64 shared libraries belong under lib/.
 
 ```text
 Architecture:   aarch64
@@ -805,80 +844,140 @@ Possible stock-provided paths:
 Verify before depending on them. Prefer dependencies in this order:
 
 1. Verified system-provided library.
-2. Application-local pure-Python module under `modules/`.
-3. Application-local compatible AArch64 shared library under `lib/`.
 
-Do not extract archives into `/`, install packages from the launcher, replace system libraries or add files to system Python directories.
+1. Application-local pure-Python module under \`modules/\`.
+
+1. Application-local compatible AArch64 shared library under \`lib/\`.
+
+Do not extract archives into /, install packages from the launcher, replace system libraries or add files to system Python directories.
+
+### Prior art and licensing
+
+[Appbernic](https://github.com/gizmo2040/appbernic) is an older GPL-3.0 Python and Pillow framework for generic Ubuntu-based Anbernic devices. Its README credits earlier graphics and input work by `macc-n`.
+
+Its modular structure, theme-driven colours and rendering helpers are useful prior art for a future reusable RG40XX V UI library. They are not verified RG40XX V hardware interfaces.
+
+If source code is copied or adapted from Appbernic, preserve the required GPL-3.0 licensing and attribution. General design ideas may be evaluated independently, but do not present copied implementation code as original work.
+
+The repository's input implementation is blocking and hardcodes an evdev path. The repository itself notes that input needs to be made non-blocking. Keep the verified non-blocking and device-aware input guidance in this document.
 
 ## 19. Compiled application checks
 
-```bash
+```text
 file my-app
 readelf -l my-app | grep interpreter
 readelf -d my-app | grep NEEDED
 ldd my-app
 ```
 
-An AArch64 build is not automatically compatible. Do not require glibc newer than `2.35`.
+An AArch64 build is not automatically compatible. Do not require glibc newer than 2.35.
 
 ## 20. Safe development workflow
 
 1. Keep the last working package as a rollback copy.
-2. Change one substantial subsystem at a time.
-3. Validate shell and Python syntax before copying.
-4. Copy the launcher and matching application folder into `APPS`.
-5. Run `sync` after installation.
-6. Launch from the TF1 menu.
-7. Inspect bounded application-local logs.
-8. Confirm a clean return to the stock menu.
-9. Use isolated workers and parent watchdogs for operations that may block.
-10. Keep modules cohesive and avoid unnecessary one-function files.
+
+1. Change one substantial subsystem at a time.
+
+1. Validate shell and Python syntax before copying.
+
+1. Copy the launcher and matching application folder into \`APPS\`.
+
+1. Run \`sync\` after installation.
+
+1. Launch from the TF1 menu.
+
+1. Inspect bounded application-local logs.
+
+1. Confirm a clean return to the stock menu.
+
+1. Use isolated workers and parent watchdogs for operations that may block.
+
+1. Keep modules cohesive and avoid unnecessary one-function files.
 
 Do not initially:
 
-- Replace `dmenu.bin`.
-- Edit stock launcher scripts.
-- Install into `/mnt/vendor`.
-- Stop the stock menu process.
-- Write directly to `/dev/fb0`.
-- Hardcode an evdev event number when the device can be identified by name.
-- Extract application archives into `/`.
-- Depend on `/mnt/sdcard` without verifying TF2 is mounted.
-- Start or kill every `volumeCtrl.dge` process by name.
-- Write to the vibration attribute before its behaviour is verified.
-- Assume the stock volume helper provides a public notification API.
-- Assume `HDMI=1` preserves internal display geometry.
+- Replace \`dmenu.bin\`.
 
-Do not copy, replace or modify helpers under `/mnt/mod/ctrl`. If a helper is later verified as required, retain its exact PID and terminate only that instance.
+- Edit stock launcher scripts.
+
+- Install into \`/mnt/vendor\`.
+
+- Stop the stock menu process.
+
+- Write directly to \`/dev/fb0\`.
+
+- Hardcode an evdev event number when the device can be identified by name.
+
+- Extract application archives into \`/\`.
+
+- Depend on \`/mnt/sdcard\` without verifying TF2 is mounted.
+
+- Start or kill every \`volumeCtrl.dge\` process by name.
+
+- Write to the vibration attribute before its behaviour is verified.
+
+- Assume the stock volume helper provides a public notification API.
+
+- Assume \`HDMI=1\` preserves internal display geometry.
+
+Do not copy, replace or modify helpers under /mnt/mod/ctrl. If a helper is later verified as required, retain its exact PID and terminate only that instance.
 
 ## 21. Remaining unknowns
 
 - Exact official firmware version represented by the tests.
-- Whether `board.ini` reports `RG40xxV` on both units.
-- Whether `language.ini` uses the reported ten-entry mapping.
-- Whether `/mnt/vendor/bin/default.ttf` exists and loads through Pillow.
-- Whether `/mnt/sdcard` is the consistent TF2 mount.
+
+- Whether \`board.ini\` reports \`RG40xxV\` on both units.
+
+- Whether \`language.ini\` uses the reported ten-entry mapping.
+
+- Whether \`/mnt/vendor/bin/default.ttf\` exists and loads through Pillow.
+
+- Whether \`/mnt/sdcard\` is the consistent TF2 mount.
+
 - Menu icon dimensions, matching rules, format and cache behaviour.
-- Whether `Imgs/<launcher-name>.png` is correct on the tested firmware.
-- Physical functions of buttons `12` and `14`.
+
+- Whether \`Imgs/<launcher-name>.png\` is correct on the tested firmware.
+
+- Physical functions of buttons \`12\` and \`14\`.
+
 - Exact evdev source and key codes for the volume keys on both units.
+
 - SDL mapping of the power button.
+
 - Whether reset produces a recordable event.
-- Physical purpose of axes beyond `0` and `1`.
-- Whether `/sys/class/extcon/hdmi/state` exists and reliably reports HDMI state.
+
+- Physical purpose of axes beyond \`0\` and \`1\`.
+
+- Whether \`/sys/class/extcon/hdmi/state\` exists and reliably reports HDMI state.
+
 - HDMI resolution, scaling, hotplug, internal-LCD and custom-audio behaviour.
+
 - Whether the internal speaker preserves stereo separation.
+
 - Whether global SDL audio shutdown can be made reliable without isolation.
+
 - Whether RGB configuration offsets differ between TF1 releases.
-- Whether the `moto` attribute controls vibration and how it behaves on failure.
+
+- Whether the \`moto\` attribute controls vibration and how it behaves on failure.
+
 - Whether stock PySDL2 exists at the reported path.
+
 - Exact SDL version and optional SDL modules.
-- Exact role and lifecycle of `volumeCtrl.dge`.
-- Whether `volumeCtrl.dge` runs during emulation and draws the stock HUD.
+
+- Exact role and lifecycle of \`volumeCtrl.dge\`.
+
+- Whether \`volumeCtrl.dge\` runs during emulation and draws the stock HUD.
+
 - Which display, graphics and input devices it opens.
+
 - Whether stock helpers expose reusable IPC.
+
 - Whether another battery, brightness or notification helper exists.
+
 - Whether a transparent notification can render over a running emulator without interrupting it.
+
+- Exact meaning and compatibility of the hardcoded framebuffer ioctls used by older generic Anbernic frameworks.
+
 - Why idle fbdev geometry differs from the SDL path beyond SDL/mali mode negotiation.
 
 ## 22. Verified application stack and stock-firmware leads
@@ -922,4 +1021,4 @@ Possible stock PySDL2:   /usr/lib/python3/dist-packages/sdl2/
 Possible menu icon:      Imgs/<launcher-name>.png
 ```
 
-Use `/mnt/mmc/Roms/APPS/My_App.sh` as the visible TF1 menu entry and `/mnt/mmc/Roms/APPS/My_App/` for code, assets, settings, persistent data and logs.
+Use /mnt/mmc/Roms/APPS/My_App.sh as the visible TF1 menu entry and /mnt/mmc/Roms/APPS/My_App/ for code, assets, settings, persistent data and logs.
