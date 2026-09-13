@@ -632,6 +632,26 @@ def read_hdmi_state():
 
 Do not assume HDMI keeps the internal geometry. Re-query window size and handle missing or unknown values. HDMI resolution, scaling, hotplug safety, internal-LCD behaviour and custom-app audio remain unresolved.
 
+### Original-firmware investigation paths
+
+Retain the following paths in all stock heads-up display and helper-process investigations:
+
+```text
+/mnt/mod/ctrl/volumeCtrl.dge
+/mnt/mod/ctrl/
+/mnt/vendor/oem/
+/mnt/vendor/bin/
+/proc/<pid>/
+/dev/fb0
+/dev/mali0
+/dev/disp
+/dev/ion
+```
+
+These paths cover the known stock volume helper, related controller helpers, OEM configuration, vendor binaries, process-specific runtime information and the likely framebuffer, Mali, display-composition and contiguous-memory interfaces. Their presence, permissions and role must be inspected read-only before any display or overlay experiment. A missing path is a valid result and must not be created by an application or probe.
+
+Do not write to `/dev/fb0`, `/dev/mali0`, `/dev/disp` or `/dev/ion` during discovery. Do not modify files under `/mnt/mod/ctrl/`, `/mnt/vendor/oem/` or `/mnt/vendor/bin/`. Under `/proc/<pid>/`, inspect only the active stock process selected for the investigation and avoid unrelated process enumeration when it is not required.
+
 ### Stock heads-up display lead
 
 /mnt/mod/ctrl/volumeCtrl.dge is the primary original-firmware lead for a system-wide heads-up display. Before implementing an independent battery popup, determine:
@@ -872,57 +892,7 @@ ldd my-app
 
 An AArch64 build is not automatically compatible. Do not require glibc newer than 2.35.
 
-## 20. Safe development workflow
-
-1. Keep the last working package as a rollback copy.
-
-1. Change one substantial subsystem at a time.
-
-1. Validate shell and Python syntax before copying.
-
-1. Copy the launcher and matching application folder into \`APPS\`.
-
-1. Run \`sync\` after installation.
-
-1. Launch from the TF1 menu.
-
-1. Inspect bounded application-local logs.
-
-1. Confirm a clean return to the stock menu.
-
-1. Use isolated workers and parent watchdogs for operations that may block.
-
-1. Keep modules cohesive and avoid unnecessary one-function files.
-
-Do not initially:
-
-- Replace \`dmenu.bin\`.
-
-- Edit stock launcher scripts.
-
-- Install into \`/mnt/vendor\`.
-
-- Stop the stock menu process.
-
-- Write directly to \`/dev/fb0\`.
-
-- Hardcode an evdev event number when the device can be identified by name.
-
-- Extract application archives into \`/\`.
-
-- Depend on \`/mnt/sdcard\` without verifying TF2 is mounted.
-
-- Start or kill every \`volumeCtrl.dge\` process by name.
-
-- Write to the vibration attribute before its behaviour is verified.
-
-- Assume the stock volume helper provides a public notification API.
-
-- Assume \`HDMI=1\` preserves internal display geometry.
-
-Do not copy, replace or modify helpers under /mnt/mod/ctrl. If a helper is later verified as required, retain its exact PID and terminate only that instance.
-
-## 21. Remaining unknowns
+## 20. Remaining unknowns
 
 - Exact official firmware version represented by the tests.
 
@@ -980,7 +950,7 @@ Do not copy, replace or modify helpers under /mnt/mod/ctrl. If a helper is later
 
 - Why idle fbdev geometry differs from the SDL path beyond SDL/mali mode negotiation.
 
-## 22. Verified application stack and stock-firmware leads
+## 21. Verified application stack and stock-firmware leads
 
 ### Verified stack
 
