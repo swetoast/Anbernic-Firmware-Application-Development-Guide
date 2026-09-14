@@ -4,7 +4,7 @@ Application packaging, runtime behaviour and hardware interfaces for Anbernic's 
 
 In this guide, **TF1** means the first microSD-card slot and the card mounted from that slot. **TF2** means the second microSD-card slot. TF1 and TF2 are storage-slot names, not firmware names.
 
-The guide covers a wider H700-based Anbernic stock-firmware family while keeping verification scope explicit. RG40XX V results are `[VERIFIED]`; sibling-model compatibility is `[LEAD]` unless stated otherwise.
+This guide documents the verified RG40XX V environment and records compatibility leads for related H700-based Anbernic Linux devices. RG40XX V results are `[VERIFIED]`; sibling-model compatibility is `[LEAD]` unless stated otherwise.
 
 The tested RG40XX V baseline uses an Allwinner H700, a 64-bit Linux userspace, Linux 4.9.170, Mali-G31 graphics, a 640 x 480 panel and dual microSD slots.
 
@@ -48,11 +48,9 @@ An unknown value remains unknown rather than falling back to another device mode
 
 ## Quick start
 
-Minimum path to a running application:
-
 1. Place a top-level shell launcher directly under `/mnt/mmc/Roms/APPS/` and place the application in a matching subdirectory.
-2. Use the reference launcher in Section 3 for single-instance locking, package-scoped environment variables, writable-storage fallback and bounded logs.
-3. Render at 640 x 480 with Pillow and present through fullscreen SDL2 using the `mali` video driver and `opengles2` renderer.
+2. Use the reference launcher in Section 3.
+3. Render a 640 x 480 Pillow frame through fullscreen SDL2.
 4. Install and validate:
 
 ```bash
@@ -63,28 +61,16 @@ bash -n /mnt/mmc/Roms/APPS/My_App.sh
 PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile /mnt/mmc/Roms/APPS/My_App/main.py
 ```
 
-First constraints encountered during development:
-
-- The APPS partition is VFAT and does not provide Unix executable metadata, symbolic links, case sensitivity or full POSIX replacement semantics.
-- Short Menu is button `13`; Menu Hold is a separate button `8` event.
-- Audio uses an isolated worker because global SDL audio shutdown blocked during testing.
-- Pillow is version 9.0.1; `Image.Resampling` is unavailable.
-
 ## Quick reference
 
 ```text
-Architecture:       aarch64
-Operating system:   Ubuntu 22.04 base
-Python:             3.10.12
-Pillow:             9.0.1
-glibc:              2.35
-Kernel:             Linux 4.9.170
-Display surface:    640 x 480
-SDL video driver:   mali
-SDL renderer:       opengles2
-SDL joystick:       ANBERNIC-keys
 TF1 card mount:     /mnt/mmc
-APPS path:          /mnt/mmc/Roms/APPS
+TF2 card lead:      /mnt/sdcard
+APPS directory:     /mnt/mmc/Roms/APPS
+Render target:      640 x 480
+Video path:         SDL2 -> mali -> opengles2
+Input identity:     ANBERNIC-keys
+Audio output:       audiocodec
 ```
 
 ### Known constants
@@ -121,8 +107,6 @@ Select=6 Start=7
 Menu Hold=8 Stick press=9 Menu short=13
 Volume Down=15 / Volume Up=16 on the first unit only
 ```
-
-The physical reset and power controls are excluded from application input probing. This does not assign those controls to SDL button indexes `12` or `14`.
 
 ## Original-firmware device family
 
@@ -178,7 +162,7 @@ SDL renderer:       opengles2
 SDL joystick:       ANBERNIC-keys
 ```
 
-The architecture, OS base, Python, Pillow, glibc, kernel and SDL video driver were re-confirmed on a second unit. The display surface is the SDL fullscreen render target used by applications. The raw framebuffer console geometry differs and is state-dependent; see Section 10.
+This is the authoritative runtime inventory for the two tested RG40XX V units. Architecture, OS base, Python, Pillow, glibc, kernel and SDL video driver were re-confirmed on the second unit. The display surface is the SDL fullscreen render target; raw framebuffer geometry is state-dependent and documented in Section 10.
 
 ### Pillow compatibility
 
@@ -297,6 +281,8 @@ Directory roles:
 
 ### Candidate stock menu icon layout
 
+`[LEAD]`
+
 Original-firmware application material indicates this optional layout:
 
 ```text
@@ -312,19 +298,21 @@ The apparent convention is `Imgs/<launcher-name>.png`. Exact filename matching, 
 
 ### TF2 card storage lead
 
+`[LEAD]`
+
 Original-firmware application material identifies the probable second-card mount point as:
 
 ```text
 /mnt/sdcard
 ```
 
-The verified TF1 card mount remains `/mnt/mmc`. Before using the TF2 card, confirm that `/mnt/sdcard` exists, is mounted and is accessible. An existing empty directory is not proof that a card is mounted.
+The verified TF1 card mount is `/mnt/mmc`. Before using the TF2 card, confirm that `/mnt/sdcard` exists, is mounted and is accessible. An existing empty directory is not proof that a card is mounted.
 
 ## 3. Reference launcher
 
 `[IMPL]`
 
-Save the launcher as `/mnt/mmc/Roms/APPS/My_App.sh`.
+Save the launcher as `My_App.sh` in the APPS directory defined in Section 2.
 
 ```bash
 #!/bin/bash
@@ -526,6 +514,8 @@ Render transient Pillow frames under /tmp, for example /tmp/My_App-screen.bmp, a
 
 ### Stock SDL and PySDL2 leads
 
+`[LEAD]`
+
 Original-firmware application material indicates:
 
 ```text
@@ -716,6 +706,8 @@ def read_sysfs(path, default="Unavailable"):
 
 ### Candidate vibration interface
 
+`[LEAD]` / `[UNRESOLVED]`
+
 Original-firmware application material identifies:
 
 ```text
@@ -801,6 +793,8 @@ Both tested states exposed no DRM connector entries, no standard backlight devic
 
 ### HDMI state lead
 
+`[LEAD]`
+
 Original-firmware material identifies:
 
 ```text
@@ -827,6 +821,8 @@ def read_hdmi_state():
 HDMI state does not establish output geometry. Window size is queried after an output change, and missing or unknown values remain unknown. HDMI resolution, scaling, hotplug safety, internal-LCD behaviour and custom-app audio remain unresolved.
 
 ### Stock heads-up display lead
+
+`[LEAD]` / `[UNRESOLVED]`
 
 /mnt/mod/ctrl/volumeCtrl.dge is the primary original-firmware lead for a system-wide heads-up display. Before implementing an independent battery popup, determine:
 
@@ -1078,84 +1074,47 @@ An AArch64 build is not automatically compatible with the tested stock firmware.
 
 ## 20. Remaining unknowns
 
-`[UNRESOLVED]`
+`[UNRESOLVED]` Probe checklist:
 
-- Exact official firmware version represented by the tests.
+### Firmware and package discovery
 
-- Whether `board.ini` reports `RG40xxV` on both units.
+- [ ] Exact official firmware version represented by the tests.
+- [ ] `board.ini` value on both units and the reported `language.ini` mapping.
+- [ ] Stock font availability and Pillow loading for `/mnt/vendor/bin/default.ttf`.
+- [ ] Consistent TF2 card mount at `/mnt/sdcard`.
+- [ ] Menu icon path, matching rules, dimensions, format and cache behaviour.
+- [ ] Stock PySDL2 path, SDL version and optional SDL modules.
 
-- Whether `language.ini` uses the reported ten-entry mapping.
+### Input and audio
 
-- Whether `/mnt/vendor/bin/default.ttf` exists and loads through Pillow.
+- [ ] Exact evdev source and key codes for both volume keys.
+- [ ] Physical purpose of analogue axes beyond `0` and `1`.
+- [ ] Internal-speaker channel routing and physical stereo separation.
+- [ ] Global SDL audio shutdown behavior without worker isolation.
 
-- Whether `/mnt/sdcard` is the consistent TF2 card mount.
+### Display, HDMI and vibration
 
-- Menu icon dimensions, matching rules, format and cache behaviour.
+- [ ] HDMI state path, resolution, scaling, hotplug, internal-LCD and audio transitions.
+- [ ] Vibration control through the `moto` attribute, including failure cleanup.
+- [ ] Reason for the idle and SDL framebuffer-mode difference beyond observed SDL/Mali mode negotiation.
 
-- Whether `Imgs/<launcher-name>.png` is correct on the tested firmware.
+### Stock helpers and overlay path
 
-- Exact evdev source and key codes for the volume keys on both units.
-
-- SDL mapping of the power button.
-
-- Whether reset produces a recordable event.
-
-- Physical purpose of axes beyond `0` and `1`.
-
-- Whether `/sys/class/extcon/hdmi/state` exists and reliably reports HDMI state.
-
-- HDMI resolution, scaling, hotplug, internal-LCD and custom-audio behaviour.
-
-- Whether the internal speaker preserves stereo separation.
-
-- Whether global SDL audio shutdown can be made reliable without isolation.
-
-- Whether RGB configuration offsets differ between stock firmware releases.
-
-- Whether the `moto` attribute controls vibration and how it behaves on failure.
-
-- Whether stock PySDL2 exists at the reported path.
-
-- Exact SDL version and optional SDL modules.
-
-- Exact role and lifecycle of `volumeCtrl.dge`.
-
-- Whether `volumeCtrl.dge` runs during emulation and draws the stock HUD.
-
-- Which display, graphics and input devices it opens.
-
-- Whether stock helpers expose reusable IPC.
-
-- Whether another battery, brightness or notification helper exists.
-
-- Whether a transparent notification can render over a running emulator without interrupting it.
-
-- Why idle fbdev geometry differs from the SDL path beyond SDL/mali mode negotiation.
+- [ ] `volumeCtrl.dge` role, lifecycle and behavior during emulation.
+- [ ] Display, graphics and input devices opened by stock helper processes.
+- [ ] Reusable sockets, FIFOs, shared memory, signals or command interfaces.
+- [ ] Additional battery, brightness or notification helpers under `/mnt/mod/ctrl/`.
+- [ ] Transparent notification rendering over an active emulator without interrupting page flipping.
 
 ## 21. Verified RG40XX V application stack
 
-### Verified RG40XX V stack
-
 ```text
-Top-level APPS shell launcher
-  -> Python 3.10.12
-  -> Pillow 9.0.1
-  -> Pillow-generated 640 x 480 frames under /tmp
-  -> SDL2
-  -> mali video driver
-  -> accelerated opengles2 renderer with software fallback
-  -> ANBERNIC-keys buttons and D-pad through SDL
-  -> short Menu on button 13
-  -> Menu Hold on button 8
-  -> analogue movement through /dev/input/js0 when required
-  -> audiocodec output through an isolated worker
-  -> AXP2202 battery and USB telemetry
-  -> Linux thermal-zone telemetry
-  -> verified DejaVu fonts
-  -> local offline assets
-  -> rtl8821cs Wi-Fi through NetworkManager and wpa_supplicant
-  -> Realtek Bluetooth through BlueZ and UART H5
-  -> BlueALSA Bluetooth audio definition
+Stock APPS launcher
+  -> Python 3.10.12 and Pillow 9.0.1
+  -> SDL2 using mali and opengles2
+  -> SDL buttons and D-pad plus /dev/input/js0 analogue input
+  -> isolated SDL audio worker using audiocodec
+  -> power, battery and thermal telemetry through sysfs
 ```
 
-On the verified RG40XX V baseline, `/mnt/mmc/Roms/APPS/My_App.sh` is the visible stock-menu entry and `/mnt/mmc/Roms/APPS/My_App/` contains code, assets, settings, persistent data and logs.
+The visible stock-menu entry is `/mnt/mmc/Roms/APPS/My_App.sh`; the matching application directory contains code, package-local dependencies, assets and persistent application data.
