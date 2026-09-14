@@ -65,7 +65,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile /mnt/mmc/Roms/APPS/My_App/main.p
 
 ```text
 TF1 card mount:     /mnt/mmc
-TF2 card lead:      /mnt/sdcard
+TF2 candidate path: /mnt/sdcard, only when mounted
 APPS directory:     /mnt/mmc/Roms/APPS
 Render target:      640 x 480
 Video path:         SDL2 -> mali -> opengles2
@@ -151,7 +151,7 @@ Official Linux firmware references:
 
 ```text
 Architecture:       aarch64
-Operating system:   Ubuntu 22.04 base
+Operating system:   Ubuntu 22.04.5 LTS
 Python:             3.10.12
 Pillow:             9.0.1
 glibc:              2.35
@@ -178,19 +178,13 @@ RESAMPLE_LANCZOS = getattr(
 )
 ```
 
-### Stock board, language and firmware configuration leads
+### Stock board, language and firmware configuration
 
-Original-firmware application material identifies these paths:
-
-```text
-/mnt/vendor/oem/board.ini
-/mnt/vendor/oem/language.ini
-```
-
-The expected board string for this device is:
+`[VERIFIED]` on the validation unit:
 
 ```text
-RG40xxV
+/mnt/vendor/oem/board.ini     RG40xxV
+/mnt/vendor/oem/language.ini  2
 ```
 
 The reported stock language-index mapping is:
@@ -208,10 +202,11 @@ The reported stock language-index mapping is:
 9  pt_BR
 ```
 
-These paths and values are `[LEAD]`, not two-unit facts. File contents and language indexes require validation. An unknown board string remains unknown rather than defaulting to another model.
+The validated language index `2` therefore corresponds to `en_US` under this mapping. Treat both files as read-only configuration inputs even when their filesystem permissions are broader than an application needs. An unknown board string or language index remains unknown rather than falling back to another model or language.
 
 ```python
 from pathlib import Path
+
 
 def read_first_line(path, default=None):
     try:
@@ -221,7 +216,7 @@ def read_first_line(path, default=None):
         return default
 ```
 
-The exact official firmware version represented by the tests remains unresolved.
+The validation also found `/mnt/vendor/oem/version.ini` and `/mnt/mod/ctrl/configs/ver.cfg`, but did not capture their contents. The exact public Anbernic firmware release represented by the tests remains unresolved. The validated low-level build identifiers are Linux `4.9.170`, kernel build `#14 SMP PREEMPT Thu Dec 25 12:29:54 CST 2025`, and U-Boot `2018.05` built on December 25, 2025 at 12:27:49.
 
 ## 2. Application discovery and package layout
 
@@ -296,17 +291,17 @@ Original-firmware application material indicates this optional layout:
 
 The apparent convention is `Imgs/<launcher-name>.png`. Exact filename matching, dimensions, format and menu-cache behaviour remain unresolved. Application discovery does not depend on a custom icon.
 
-### TF2 card storage lead
+### TF2 card storage
 
-`[LEAD]`
+`[VERIFIED]` `/mnt/sdcard` exists as a directory on the validation unit, but no filesystem was mounted there during the final probe. `findmnt /mnt/sdcard` returned no mount and filesystem queries resolved to the root filesystem instead. The directory itself is therefore not evidence that TF2 is present.
 
-Original-firmware application material identifies the probable second-card mount point as:
+Original-firmware application material still identifies `/mnt/sdcard` as the candidate TF2 mount point. Verify the mount itself before reading or writing:
 
-```text
-/mnt/sdcard
+```bash
+findmnt -M /mnt/sdcard
 ```
 
-The verified TF1 card mount is `/mnt/mmc`. Before using the TF2 card, confirm that `/mnt/sdcard` exists, is mounted and is accessible. An existing empty directory is not proof that a card is mounted.
+Treat TF2 as unavailable unless the command returns a distinct mounted filesystem. Runtime handling should distinguish a mounted card from an empty directory, removed media and read-only media.
 
 ## 3. Reference launcher
 
@@ -451,9 +446,28 @@ sed -i 's/\r$//' /mnt/mmc/Roms/APPS/My_App.sh
 
 ### Stock volume-controller helper
 
-`[LEAD]` / `[UNRESOLVED]` Original-firmware launchers reference `/mnt/mod/ctrl/volumeCtrl.dge`. Some launchers start the helper before a fullscreen Python application and terminate it after the application exits. The helper may handle volume input, the stock HUD, or both; its device access, IPC and exact lifecycle remain unresolved.
+`[VERIFIED]` `/mnt/mod/ctrl/volumeCtrl.dge` is a stripped 32-bit ARM EABI5 hard-float executable using `/lib/ld-linux-armhf.so.3`. It is dynamically linked against the stock legacy SDL stack, including SDL 1.2, SDL_image 1.2, SDL_ttf 2.0 and SDL_gfx. A normal AArch64 `ldd` invocation reports `not a dynamic executable`; use `readelf -d` to inspect this 32-bit helper.
 
-Process-name-wide termination such as `kill -9 $(pidof volumeCtrl.dge)` affects every matching instance and bypasses cleanup. A launcher that starts the helper can retain its PID and process start time under `/proc/<pid>/` to target that instance only.
+Embedded paths and strings verify that the helper knows about:
+
+```text
+/dev/disp
+/dev/input/event0
+/dev/input/event1
+/mnt/data/dmenu/localpad.map
+/sys/class/extcon/hdmi/state
+/sys/class/power_supply/axp2202-battery/brightness
+/sys/class/power_supply/axp2202-battery/moto
+/sys/class/power_supply/axp2202-battery/nds_esckey
+/sys/class/power_supply/axp2202-battery/nds_pwrkey
+/sys/class/power_supply/axp2202-battery/openbor_volume
+/sys/class/power_supply/axp2202-battery/voltage_now
+/sys/class/power_supply/axp2202-usb/online
+```
+
+It also contains brightness-ioctl, HDMI-state, ALSA-device and input-discovery references. This establishes that it is a broader hardware-control helper, not merely an arbitrary launcher binary. Its exact lifecycle, HUD rendering behavior, communication with `dmenu.bin`, and behavior during emulation remain unresolved.
+
+Some stock launchers start the helper before a fullscreen application and terminate it afterward. Avoid process-name-wide termination such as `kill -9 $(pidof volumeCtrl.dge)`. A launcher that starts the helper should retain its PID and process start time under `/proc/<pid>/` and terminate only the instance it owns.
 
 ## 4. SDL2 application baseline
 
@@ -512,24 +526,28 @@ Open joystick index 0 and verify the reported device name. The tested device rep
 
 Render transient Pillow frames under /tmp, for example /tmp/My_App-screen.bmp, and remove them during normal shutdown.
 
-### Stock SDL and PySDL2 leads
+### Stock SDL and PySDL2
 
-`[LEAD]`
-
-Original-firmware application material indicates:
+`[VERIFIED]` the stock PySDL2 package and stock SDL 2.0.12 libraries are present:
 
 ```text
+/usr/lib/python3/dist-packages/sdl2/
 /usr/lib/libSDL2.so
 /usr/lib/libSDL2-2.0.so.0.12.0
-/usr/lib/python3/dist-packages/sdl2/
-SDL 2.0.12
 ```
 
-These exact paths and the PySDL2 installation remain unconfirmed across both units. The verified ctypes loader remains the baseline.
+A separate Ubuntu AArch64 SDL2 installation is also present:
 
-When PySDL2 is unavailable, pure-Python bindings can be packaged under `modules/`. Extracting `sdl2.zip` or another application archive into `/` modifies the firmware filesystem and can overwrite system files.
+```text
+/usr/lib/aarch64-linux-gnu/libSDL2-2.0.so.0
+SDL 2.28.5
+```
 
-Stock apps have been observed requesting SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_SHOWN. The tested stock environment has no verified desktop compositor. Always query actual window dimensions.
+Library selection is therefore significant. `ctypes.util.find_library("SDL2")` returns the unqualified name `libSDL2-2.0.so.0`, whose final target depends on runtime library search order. Use `/usr/lib/libSDL2-2.0.so.0.12.0` when the application specifically requires the validated stock SDL 2.0.12 and Mali behavior. Do not assume that every SDL lookup resolves to the same implementation.
+
+When PySDL2 is unavailable on another unit or model, pure-Python bindings can be packaged under `modules/`. Do not extract an application archive into `/` or replace system libraries.
+
+Stock applications have been observed requesting `SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_SHOWN`. The tested environment has no verified desktop compositor. Always query the actual window dimensions.
 
 ## 5. Physical input mapping
 
@@ -704,19 +722,17 @@ def read_sysfs(path, default="Unavailable"):
         return default
 ```
 
-### Candidate vibration interface
+### Vibration interface
 
-`[LEAD]` / `[UNRESOLVED]`
-
-Original-firmware application material identifies:
+`[VERIFIED]` the attribute exists and was readable and writable by the root validation process:
 
 ```text
 /sys/class/power_supply/axp2202-battery/moto
 ```
 
-The reported values are `1` to start and `0` to stop. Existence, permissions, accepted values, stop behaviour, crash behaviour and emulator-rumble interaction remain unresolved on the tested units.
+The final validation did not write to it. The reported values remain `1` to start and `0` to stop, but accepted values, physical effect, timing, stop behavior, crash cleanup and emulator-rumble interaction remain `[UNRESOLVED]`.
 
-A future implementation can access a verified sysfs attribute directly and write `0` from guaranteed cleanup logic. A compound `shell=True` command would make stop handling depend on shell execution.
+Do not expose vibration in a production application until an interactive test has confirmed both activation and reliable stopping. A future implementation should write directly to the verified sysfs attribute and guarantee a final `0` during cleanup. Avoid compound `shell=True` commands.
 
 ## 9. System information, USB power and thermals
 
@@ -791,20 +807,23 @@ os.close(fd)
 
 Both tested states exposed no DRM connector entries, no standard backlight device, no X11 and no Wayland. Fullscreen SDL2 at 640 x 480 is the verified rendering path; direct `/dev/fb0` output is not part of that path.
 
-### HDMI state lead
+### HDMI state
 
-`[LEAD]`
-
-Original-firmware material identifies:
+`[VERIFIED]` the HDMI state interface exists and is readable:
 
 ```text
 /sys/class/extcon/hdmi/state
 ```
 
-Reported values are HDMI=0 and HDMI=1. This remains unconfirmed across both units.
+The disconnected validation state returned:
+
+```text
+HDMI=0
+```
 
 ```python
 from pathlib import Path
+
 
 def read_hdmi_state():
     try:
@@ -818,7 +837,7 @@ def read_hdmi_state():
     return None
 ```
 
-HDMI state does not establish output geometry. Window size is queried after an output change, and missing or unknown values remain unknown. HDMI resolution, scaling, hotplug safety, internal-LCD behaviour and custom-app audio remain unresolved.
+The connected value `HDMI=1`, hotplug behavior, output geometry, scaling, internal-LCD behavior and custom-application audio transitions remain unresolved. HDMI state alone does not establish output geometry. Query the actual window dimensions after any output change.
 
 ### Stock heads-up display lead
 
@@ -842,13 +861,15 @@ HDMI state does not establish output geometry. Window size is queried after an o
 
 - Whether its overlay survives emulator page flipping and HDMI output.
 
-A second fullscreen SDL window has not been shown to provide system-wide composition. The stock helper is the active investigation target.
+A second fullscreen SDL window has not been shown to provide system-wide composition. The stock helper remains the active investigation target.
+
+`[VERIFIED]` The running `dmenu.bin` stock-menu process had `/dev/fb0`, `/dev/ion`, `/dev/disp`, `/dev/input/event0`, `/dev/input/event1`, `/dev/snd/pcmC0D0p`, `/dev/ttyS5` and `/mnt/vendor/bin/default.ttf` open. Its mappings included `/dev/fb0`, deleted DMA buffers and vendor SDL 1.2 libraries. This establishes a direct framebuffer/display path using ION-backed DMA buffers and legacy SDL 1.2 components for the stock menu. It does not establish a reusable overlay API for custom applications.
 
 Screen validation in the reference implementation includes solid colours, greyscale, colour bars, gradients, checkerboards, one-pixel lines, borders, corner markers, a centre crosshair and cycling pixel-inspection fields. Brightness and resolution control interfaces remain unresolved.
 
 ### Original-firmware investigation paths
 
-`[LEAD]` Retain these paths in stock HUD and helper-process investigations:
+`[VERIFIED]` These paths exist on the validation unit and remain relevant to stock HUD and helper-process investigations:
 
 ```text
 /mnt/mod/ctrl/volumeCtrl.dge
@@ -862,7 +883,16 @@ Screen validation in the reference implementation includes solid colours, greysc
 /dev/ion
 ```
 
-Discovery records their presence, permissions, open descriptors, mapped libraries and IPC without changing firmware or device state.
+Validated permissions were:
+
+```text
+/dev/fb0    root:video  0660
+/dev/mali0  root:root   0666
+/dev/disp   root:root   0600
+/dev/ion    root:root   0600
+```
+
+Non-root applications cannot assume access to `/dev/disp` or `/dev/ion`. Discovery records presence, permissions, open descriptors, mapped libraries and IPC without changing firmware or device state.
 
 ### Historical direct-framebuffer prior art
 
@@ -888,13 +918,13 @@ All seven were re-confirmed on a second unit and loaded with Pillow at sizes 10,
 
 DejaVu Sans covers labels and natural-language status, Bold covers headings, Mono covers measurements and Mono Bold covers prominent aligned values. Liberation Sans was not present in the tested inventory. Text fitting uses rendered pixel width rather than character count.
 
-Original-firmware material also identifies:
+The stock font is also verified:
 
 ```text
 /mnt/vendor/bin/default.ttf
 ```
 
-This stock font remains unconfirmed. The verified DejaVu paths remain preferred.
+It loaded successfully through Pillow and was held open by the running stock menu. A same-size copy was present at `/mnt/mod/ctrl/configs/default.ttf`. Prefer `/mnt/vendor/bin/default.ttf` when matching the stock interface, while the verified DejaVu fonts remain suitable application defaults.
 
 ## 12. Joystick RGB configuration
 
@@ -930,7 +960,7 @@ Effect and enabled fields remain outside the verified edit interface. The verifi
 
 Required UI assets are packaged locally; runtime does not depend on network-hosted fonts, icons or images. A compact application may use one cohesive sprite sheet instead of many small files. Readable text labels preserve usability when decorative assets cannot be loaded.
 
-Verified system fonts cover the documented UI roles. `/mnt/vendor/bin/default.ttf` remains `[LEAD]`, not a verified dependency.
+Verified system fonts cover the documented UI roles. `/mnt/vendor/bin/default.ttf` is also verified and may be used when an application intentionally wants the stock typeface.
 
 The possible stock launcher-icon convention is:
 
@@ -984,7 +1014,7 @@ bluetoothctl devices Connected
 bluetoothctl devices Bonded
 ```
 
-The older paired-devices command is unavailable. Google Pixel Buds Pro and a Nintendo Pro Controller were simultaneously paired, bonded and connected. The controller worked for normal input. BlueALSA exposes a bluealsa PCM while the Bluetooth stack runs.
+The older paired-devices command is unavailable. Google Pixel Buds Pro and a Nintendo Pro Controller were previously verified as simultaneously paired, bonded and connected, and the controller worked for normal input. During the final validation both devices were paired and bonded but not connected. A `bluealsa` PCM definition was installed, but no `bluealsa` process was running during that probe; do not equate PCM availability with an active Bluetooth-audio service.
 
 ## 15. Reference implementation
 
@@ -1031,7 +1061,7 @@ The APPS partition is VFAT, re-confirmed on a second unit. Unix ownership, execu
 
 Use /tmp for scratch data. Use config/, data/ and logs/ only for persistent content. Avoid unnecessary writes.
 
-The verified TF1 card mount is `/mnt/mmc`. Original-firmware material identifies `/mnt/sdcard` as the probable TF2 card mount. Runtime detection distinguishes mounted, empty, removed and read-only TF2 media. Keep packaged code anchored to the launcher directory rather than searching both cards.
+The verified TF1 card mount is `/mnt/mmc`. `/mnt/sdcard` exists on the validation unit but was not a mount point during the final probe; it resolved to the root filesystem. Original-firmware material identifies it only as the candidate TF2 mount. Require a successful `findmnt -M /mnt/sdcard` result before treating it as TF2. Keep packaged code anchored to the launcher directory rather than searching both cards.
 
 ## 18. Local dependencies
 
@@ -1043,7 +1073,7 @@ Python ABI:     Python 3.10
 C library:      glibc 2.35 or older-compatible
 ```
 
-Possible stock-provided paths:
+Verified stock-provided paths:
 
 ```text
 /usr/lib/python3/dist-packages/sdl2/
@@ -1051,7 +1081,7 @@ Possible stock-provided paths:
 /usr/lib/libSDL2-2.0.so.0.12.0
 ```
 
-These paths require verification before use. Dependency resolution order:
+These paths and SDL 2.0.12 were confirmed on the validation unit. A separate SDL 2.28.5 installation exists under `/usr/lib/aarch64-linux-gnu/`, so explicit library selection is required when stock Mali behavior matters. Dependency resolution order:
 
 1. Verified system-provided library.
 
@@ -1074,16 +1104,14 @@ An AArch64 build is not automatically compatible with the tested stock firmware.
 
 ## 20. Remaining unknowns
 
-`[UNRESOLVED]` Probe checklist:
+`[UNRESOLVED]` Items still requiring targeted or interactive validation:
 
 ### Firmware and package discovery
 
-- [ ] Exact official firmware version represented by the tests.
-- [ ] `board.ini` value on both units and the reported `language.ini` mapping.
-- [ ] Stock font availability and Pillow loading for `/mnt/vendor/bin/default.ttf`.
-- [ ] Consistent TF2 card mount at `/mnt/sdcard`.
-- [ ] Menu icon path, matching rules, dimensions, format and cache behaviour.
-- [ ] Stock PySDL2 path, SDL version and optional SDL modules.
+- [ ] Exact public Anbernic firmware release represented by the tests.
+- [ ] Contents and meaning of `/mnt/vendor/oem/version.ini` and `/mnt/mod/ctrl/configs/ver.cfg`.
+- [ ] Actual TF2 mount point with a second card inserted.
+- [ ] Menu icon path, filename matching, dimensions, format and cache behavior.
 
 ### Input and audio
 
@@ -1094,17 +1122,18 @@ An AArch64 build is not automatically compatible with the tested stock firmware.
 
 ### Display, HDMI and vibration
 
-- [ ] HDMI state path, resolution, scaling, hotplug, internal-LCD and audio transitions.
-- [ ] Vibration control through the `moto` attribute, including failure cleanup.
+- [ ] Connected HDMI value, resolution, scaling, hotplug, internal-LCD behavior and audio transitions.
+- [ ] Vibration activation and stop semantics through the verified `moto` attribute, including failure cleanup.
 - [ ] Reason for the idle and SDL framebuffer-mode difference beyond observed SDL/Mali mode negotiation.
 
 ### Stock helpers and overlay path
 
-- [ ] `volumeCtrl.dge` role, lifecycle and behavior during emulation.
-- [ ] Display, graphics and input devices opened by stock helper processes.
+- [ ] `volumeCtrl.dge` lifecycle, exact functions and behavior during emulation.
+- [ ] Whether `volumeCtrl.dge` renders a HUD itself or delegates rendering to another process.
+- [ ] Communication between `volumeCtrl.dge`, `dmenu.bin` and other stock processes.
 - [ ] Reusable sockets, FIFOs, shared memory, signals or command interfaces.
-- [ ] Additional battery, brightness or notification helpers under `/mnt/mod/ctrl/`.
 - [ ] Transparent notification rendering over an active emulator without interrupting page flipping.
+- [ ] Whether the unusually large set of `/proc/<pid>/mounts` descriptors observed in `dmenu.bin` is intentional stock behavior or a resource leak.
 
 ## 21. Verified RG40XX V application stack
 
